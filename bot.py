@@ -100,13 +100,10 @@ def webinar_keyboard(label: str = "СМОТРЕТЬ УРОК 🎬"):
     )
 
 def academy_join_keyboard(label: str = "ПОПРОБОВАТЬ 🎓"):
-    # callback_data вместо url: клик логируется, а пользователя всё равно
-    # автоматически перекидывает по ссылке (см. cb_academy_join — Telegram
-    # сам открывает t.me-ссылки, переданные через answer(url=...))
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=label,          callback_data="academy_try")],
-            [InlineKeyboardButton(text="ПОДРОБНЕЕ 📖", callback_data="academy_details")],
+            [InlineKeyboardButton(text=label,          url=ACADEMY_BOT_LINK)],
+            [InlineKeyboardButton(text="ПОДРОБНЕЕ 📖", url=ACADEMY_BOT_LINK)],
         ]
     )
 
