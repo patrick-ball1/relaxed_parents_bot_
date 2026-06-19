@@ -109,7 +109,7 @@ def academy_join_keyboard(label: str = "ПОПРОБОВАТЬ 🎓"):
 
 def join_keyboard(label: str = "Вступаю в канал 🎓"):
     return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=label, url=BOT_LINK)]]
+        inline_keyboard=[[InlineKeyboardButton(text=label, url=ACADEMY_BOT_LINK)]]
     )
 
 def reviews_keyboard():
@@ -152,7 +152,9 @@ async def cmd_academy(message: Message):
         "• Планы развития по неделям\n\n"
         "Доступ всего за *4980₸ (~$9,5) в месяц* 🎁",
         parse_mode="Markdown",
-        reply_markup=join_keyboard("Вступить в Академию 🎓"),
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Вступить в Академию 🎓", url=ACADEMY_BOT_LINK)]]
+        ),
     )
 
 @router.message(Command("reviews"))
