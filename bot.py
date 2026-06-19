@@ -185,17 +185,17 @@ async def cb_watch_webinar(callback: CallbackQuery):
     user_id = callback.from_user.id
     await log_event(user_id, "webinar_watched")
 
-    # Отменяем напоминания "ты ещё не посмотрела вебинар" — она уже посмотрела
+    # Отменяем напоминания "ты ещё не посмотрела вебинар"
     for job_id in ("remind_10min", "remind_1h", "social_proof"):
         job = scheduler.get_job(f"{user_id}_{job_id}")
         if job:
             job.remove()
             logger.info(f"Cancelled {user_id}_{job_id} — webinar already watched")
 
-    # Запускаем дальнейшую цепочку (питч, оффер и т.д.) от момента клика,
-    # а не от /start — как и нарисовано на схеме воронки.
+    # Запускаем цепочку от момента клика
     await schedule_post_webinar_chain(user_id)
 
+    # Сразу даём реальную ссылку
     await callback.message.answer(
         "Вот ссылка на вебинар 👇",
         reply_markup=InlineKeyboardMarkup(
@@ -379,7 +379,11 @@ async def final_message(user_id: int):
 # Если кликнет — шаги pitch_academy и далее будут переписаны на
 # время от клика (см. schedule_post_webinar_chain), а remind/social_proof отменятся.
 async def schedule_funnel(user_id: int):
+    from datetime import timezone
     start = await db.get_start_time(user_id)
+    # Убеждаемся, что start — timezone-aware (UTC), иначе APScheduler не сохранит джоб
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
 
     schedule = [
         (10,    "remind_10min",  remind_webinar_10min),
@@ -406,6 +410,15 @@ async def schedule_funnel(user_id: int):
             logger.info(f"Scheduled {jid} at {run_at}")
 
 
+async def thank_you_2min(user_id: int):
+    await bot.send_message(
+        user_id,
+        "Благодарим за участие! 🙏\n\n"
+        "Надеемся, вебинар был полезен для тебя и твоего малыша 💛",
+    )
+    await log_event(user_id, "thank_you_sent")
+
+
 # Цепочка "посмотрела вебинар" — отсчитывается от МОМЕНТА КЛИКА.
 # Job_id здесь совпадают с теми, что в schedule_funnel (pitch_academy,
 # offer_3h, reviews_6h, story_julia, final_msg) — поэтому replace_existing=True
@@ -413,15 +426,17 @@ async def schedule_funnel(user_id: int):
 # на новое время от клика. remind_10min/remind_1h/social_proof в этой
 # цепочке нет — их отдельно отменяет cb_watch_webinar.
 async def schedule_post_webinar_chain(user_id: int):
-    now = datetime.utcnow()
+    from datetime import timezone
+    now = datetime.now(tz=timezone.utc)
 
     # (минуты_от_клика, job_id, функция)
     schedule = [
-        (30,    "pitch_academy", pitch_academy),     # через 30 мин после клика
-        (210,   "offer_3h",      offer_3h),           # +3ч после питча
-        (570,   "reviews_6h",    reviews_6h),         # +6ч после оффера
-        (1290,  "story_julia",   story_julia_12h),    # +12ч после отзывов
-        (2010,  "final_msg",     final_message),      # +12ч после истории
+        (2,     "thank_you",     thank_you_2min),      # +2 мин — благодарность
+        (30,    "pitch_academy", pitch_academy),        # +30 мин — питч академии
+        (210,   "offer_3h",      offer_3h),             # +3ч после питча
+        (570,   "reviews_6h",    reviews_6h),           # +6ч после оффера
+        (1290,  "story_julia",   story_julia_12h),      # +12ч после отзывов
+        (2010,  "final_msg",     final_message),        # +12ч после истории
     ]
 
     for minutes, job_id, func in schedule:
