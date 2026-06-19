@@ -3,3 +3,6 @@ apscheduler==3.10.4
 sqlalchemy==2.0.30
 aiosqlite==0.20.0
 openpyxl==3.1.2
+greenlet==3.0.3
+pydantic==2.6.4
+pydantic-core==2.16.3
