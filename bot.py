@@ -30,8 +30,10 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     BotCommand,
     BotCommandScopeDefault,
+    FSInputFile,
 )
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 
 from config import BOT_TOKEN, ACADEMY_URL, GUIDE_PDF_PATH, VIDEO_DAY1_PATH
 from database import Database
@@ -47,12 +49,29 @@ router = Router()
 dp.include_router(router)
 
 db = Database()
-scheduler = AsyncIOScheduler()
+
+# Планировщик хранит задания не в памяти, а в файле — переживает перезапуски процесса.
+# Когда подключите Railway Volume, поменяйте JOBS_DB_PATH (env var) на /data/jobs.sqlite
+JOBS_DB_PATH = os.getenv("JOBS_DB_PATH", "jobs.sqlite")
+scheduler = AsyncIOScheduler(
+    jobstores={"default": SQLAlchemyJobStore(url=f"sqlite:///{JOBS_DB_PATH}")}
+)
+
+# Telegram ID администратора(ов) — только им доступна команда /report.
+# Узнать свой ID можно у @userinfobot. Можно перечислить несколько через запятую в ADMIN_IDS.
+ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 
 # ── Ссылки (настройте в config.py или через ENV) ─────────────────────────────
 WEBINAR_URL   = os.getenv("WEBINAR_URL",  "https://youtu.be/hmeUnKo_twc?si=zlzdR78cqM-gzN6b")
 REVIEWS_URL   = os.getenv("REVIEWS_URL",  "https://t.me/+SNRZMUcm-9M5MzEy")
 BOT_LINK      = os.getenv("BOT_LINK",     "https://t.me/relaxed_parents_bot")   # ссылка на самого бота (для кнопок «Вступить»)
+
+# Ссылка именно для шага "питч академии" (кнопки ПОПРОБОВАТЬ / ПОДРОБНЕЕ).
+# Отдельная от BOT_LINK по просьбе — здесь должна быть конкретная трекинг-ссылка.
+ACADEMY_BOT_LINK = os.getenv(
+    "ACADEMY_BOT_LINK",
+    "https://t.me/parent_academy_kz_bot?start=tg_doc_malysh_urok",
+)
 
 
 # ──────────────────────────────────────────────
@@ -74,15 +93,20 @@ BOT_COMMANDS = [
 # Keyboards
 # ──────────────────────────────────────────────
 def webinar_keyboard(label: str = "СМОТРЕТЬ УРОК 🎬"):
+    # callback_data вместо url: так бот узнаёт о нажатии и может отменить
+    # дальнейшие "ты не посмотрела вебинар" напоминания (см. cb_watch_webinar)
     return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=label, url=WEBINAR_URL)]]
+        inline_keyboard=[[InlineKeyboardButton(text=label, callback_data="watch_webinar")]]
     )
 
 def academy_join_keyboard(label: str = "ПОПРОБОВАТЬ 🎓"):
+    # callback_data вместо url: клик логируется, а пользователя всё равно
+    # автоматически перекидывает по ссылке (см. cb_academy_join — Telegram
+    # сам открывает t.me-ссылки, переданные через answer(url=...))
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=label,          url=BOT_LINK)],
-            [InlineKeyboardButton(text="ПОДРОБНЕЕ 📖", url=BOT_LINK)],
+            [InlineKeyboardButton(text=label,          callback_data="academy_try")],
+            [InlineKeyboardButton(text="ПОДРОБНЕЕ 📖", callback_data="academy_details")],
         ]
     )
 
@@ -150,6 +174,57 @@ async def cmd_help(message: Message):
         "/reviews — отзывы участников\n\n"
         "Или просто напишите свой вопрос — ассистент ответит 💙",
         parse_mode="Markdown",
+    )
+
+
+# ──────────────────────────────────────────────
+# Клик по кнопке вебинара
+# ──────────────────────────────────────────────
+@router.callback_query(F.data == "watch_webinar")
+async def cb_watch_webinar(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    await log_event(user_id, "webinar_watched")
+
+    # Отменяем напоминания "ты ещё не посмотрела вебинар" — она уже посмотрела
+    for job_id in ("remind_10min", "remind_1h", "social_proof"):
+        job = scheduler.get_job(f"{user_id}_{job_id}")
+        if job:
+            job.remove()
+            logger.info(f"Cancelled {user_id}_{job_id} — webinar already watched")
+
+    await callback.message.answer(
+        "Вот ссылка на вебинар 👇",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="СМОТРЕТЬ УРОК 🎬", url=WEBINAR_URL)]]
+        ),
+    )
+    await callback.answer()
+
+
+# ──────────────────────────────────────────────
+# Клик по кнопкам "ПОПРОБОВАТЬ" / "ПОДРОБНЕЕ" (питч академии)
+# ──────────────────────────────────────────────
+@router.callback_query(F.data.in_({"academy_try", "academy_details"}))
+async def cb_academy_join(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    await log_event(user_id, "academy_link_clicked", {"button": callback.data})
+
+    # answer(url=...) с t.me-ссылкой: Telegram сам откроет её у пользователя,
+    # а бот при этом получает callback и может залогировать клик.
+    await callback.answer(url=ACADEMY_BOT_LINK)
+
+
+# ──────────────────────────────────────────────
+# Аналитика (только для админа)
+# ──────────────────────────────────────────────
+@router.message(Command("report"))
+async def cmd_report(message: Message):
+    if message.from_user.id not in ADMIN_IDS:
+        return
+    await rebuild_excel()
+    await message.answer_document(
+        FSInputFile(EXCEL_PATH),
+        caption="📊 Аналитика бота — обновлено только что",
     )
 
 
