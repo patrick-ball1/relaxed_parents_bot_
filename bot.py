@@ -192,6 +192,10 @@ async def cb_watch_webinar(callback: CallbackQuery):
             job.remove()
             logger.info(f"Cancelled {user_id}_{job_id} — webinar already watched")
 
+    # Запускаем дальнейшую цепочку (питч, оффер и т.д.) от момента клика,
+    # а не от /start — как и нарисовано на схеме воронки.
+    await schedule_post_webinar_chain(user_id)
+
     await callback.message.answer(
         "Вот ссылка на вебинар 👇",
         reply_markup=InlineKeyboardMarkup(
@@ -368,19 +372,24 @@ async def final_message(user_id: int):
 # ──────────────────────────────────────────────
 # Планировщик воронки
 # ──────────────────────────────────────────────
+
+# Полная цепочка "по умолчанию", отсчитывается от /start.
+# Используется, если человек так и НЕ нажмёт на кнопку вебинара —
+# тогда вся воронка едет по этому расписанию целиком.
+# Если кликнет — шаги pitch_academy и далее будут переписаны на
+# время от клика (см. schedule_post_webinar_chain), а remind/social_proof отменятся.
 async def schedule_funnel(user_id: int):
     start = await db.get_start_time(user_id)
 
-    # (минуты_от_старта, job_id, функция)
     schedule = [
-        (10,    "remind_10min",    remind_webinar_10min),
-        (60,    "remind_1h",       remind_webinar_1h),
-        (720,   "social_proof",    social_proof_12h),
-        (750,   "pitch_academy",   pitch_academy),      # +30 мин после 12ч
-        (930,   "offer_3h",        offer_3h),           # +3ч после питча
-        (1290,  "reviews_6h",      reviews_6h),         # +6ч после оффера
-        (2010,  "story_julia",     story_julia_12h),    # +12ч после отзывов
-        (2730,  "final_msg",       final_message),      # +12ч после истории
+        (10,    "remind_10min",  remind_webinar_10min),
+        (60,    "remind_1h",     remind_webinar_1h),
+        (720,   "social_proof",  social_proof_12h),
+        (750,   "pitch_academy", pitch_academy),       # +30 мин после 12ч
+        (930,   "offer_3h",      offer_3h),             # +3ч после питча
+        (1290,  "reviews_6h",    reviews_6h),           # +6ч после оффера
+        (2010,  "story_julia",   story_julia_12h),      # +12ч после отзывов
+        (2730,  "final_msg",     final_message),        # +12ч после истории
     ]
 
     for minutes, job_id, func in schedule:
@@ -395,6 +404,37 @@ async def schedule_funnel(user_id: int):
                 replace_existing=True,
             )
             logger.info(f"Scheduled {jid} at {run_at}")
+
+
+# Цепочка "посмотрела вебинар" — отсчитывается от МОМЕНТА КЛИКА.
+# Job_id здесь совпадают с теми, что в schedule_funnel (pitch_academy,
+# offer_3h, reviews_6h, story_julia, final_msg) — поэтому replace_existing=True
+# просто перезаписывает уже стоящие "от старта" версии этих же шагов
+# на новое время от клика. remind_10min/remind_1h/social_proof в этой
+# цепочке нет — их отдельно отменяет cb_watch_webinar.
+async def schedule_post_webinar_chain(user_id: int):
+    now = datetime.utcnow()
+
+    # (минуты_от_клика, job_id, функция)
+    schedule = [
+        (30,    "pitch_academy", pitch_academy),     # через 30 мин после клика
+        (210,   "offer_3h",      offer_3h),           # +3ч после питча
+        (570,   "reviews_6h",    reviews_6h),         # +6ч после оффера
+        (1290,  "story_julia",   story_julia_12h),    # +12ч после отзывов
+        (2010,  "final_msg",     final_message),      # +12ч после истории
+    ]
+
+    for minutes, job_id, func in schedule:
+        run_at = now + timedelta(minutes=minutes)
+        jid = f"{user_id}_{job_id}"
+        scheduler.add_job(
+            func, "date",
+            run_date=run_at,
+            args=[user_id],
+            id=jid,
+            replace_existing=True,
+        )
+        logger.info(f"Scheduled {jid} at {run_at}")
 
 
 # ──────────────────────────────────────────────
