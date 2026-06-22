@@ -151,14 +151,15 @@ def _build_events_sheet(ws, rows: list):
 FUNNEL_HEADERS = ["Этап воронки", "Кол-во пользователей", "% от старта"]
 FUNNEL_STEPS = [
     ("bot_started",           "🚀 Зашёл в бот"),
-    ("name_collected",        "📝 Ввёл имя"),
-    ("age_segmented",         "👶 Выбрал сегмент"),
-    ("guide_delivered",       "📄 Получил гайд"),
-    ("guide_opened_button",   "✅ Открыл гайд"),
-    ("day1_engaged",          "▶️ День 1 — видео"),
-    ("day2_read",             "📖 День 2 — история"),
-    ("day3_interest_clicked", "🔥 День 3 — горячий лид"),
-    ("day4_offer_sent",       "💌 День 4 — оффер"),
+    ("webinar_offered",       "🎬 Увидел кнопку вебинара"),
+    ("webinar_watched",       "▶️ Нажал смотреть вебинар"),
+    ("thank_you_sent",        "🙏 Получил благодарность"),
+    ("pitch_academy_sent",    "✨ Получил питч академии"),
+    ("academy_link_clicked",  "🎓 Нажал на кнопку академии"),
+    ("offer_3h_sent",         "💰 Получил оффер 4980₸"),
+    ("reviews_6h_sent",       "💬 Получил отзывы"),
+    ("story_julia_sent",      "📖 Получил историю Юлии"),
+    ("final_message_sent",    "🏁 Получил финальный призыв"),
 ]
 
 
