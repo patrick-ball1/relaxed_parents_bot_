@@ -350,8 +350,13 @@ async def story_julia_12h(user_id: int):
         "ведь здесь всегда рядом специалисты, готовые поддержать и помочь 🤝\n\n"
         "В нашем канале есть все специалисты, которые необходимы для помощи всем родителям по проблемам "
         "хаотичного сна, частых пробуждений, ГВ, ИВ, коликам и прочим горячим вопросам.\n\n"
-        "Вступить - ссылка на бот",
-        reply_markup=join_keyboard("Вступить 💙"),
+        "Послушай что говорит Юлия 👇",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="▶️ Смотреть отзыв Юлии", url="https://drive.google.com/file/d/1A9aDdJMqTuUftfk2N8P0i89bUloY6Iei/view?usp=sharing")],
+                [InlineKeyboardButton(text="Вступить 💙", url=ACADEMY_BOT_LINK)],
+            ]
+        ),
     )
     await log_event(user_id, "story_julia_sent")
 
