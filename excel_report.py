@@ -159,6 +159,7 @@ FUNNEL_STEPS = [
     ("offer_3h_sent",         "💰 Получил оффер 4980₸"),
     ("reviews_6h_sent",       "💬 Получил отзывы"),
     ("story_julia_sent",      "📖 Получил историю Юлии"),
+    ("julia_video_clicked",   "▶️ Посмотрел отзыв Юлии"),
     ("final_message_sent",    "🏁 Получил финальный призыв"),
 ]
 

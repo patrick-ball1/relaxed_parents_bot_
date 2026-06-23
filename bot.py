@@ -217,6 +217,13 @@ async def cb_academy_join(callback: CallbackQuery):
     await callback.answer(url=ACADEMY_BOT_LINK)
 
 
+@router.callback_query(F.data == "watch_julia")
+async def cb_watch_julia(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    await log_event(user_id, "julia_video_clicked")
+    await callback.answer(url="https://drive.google.com/file/d/1A9aDdJMqTuUftfk2N8P0i89bUloY6Iei/view?usp=sharing")
+
+
 # ──────────────────────────────────────────────
 # Аналитика (только для админа)
 # ──────────────────────────────────────────────
@@ -353,7 +360,7 @@ async def story_julia_12h(user_id: int):
         "Послушай что говорит Юлия 👇",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="▶️ Смотреть отзыв Юлии", url="https://drive.google.com/file/d/1A9aDdJMqTuUftfk2N8P0i89bUloY6Iei/view?usp=sharing")],
+                [InlineKeyboardButton(text="▶️ Смотреть отзыв Юлии", callback_data="watch_julia")],
                 [InlineKeyboardButton(text="Вступить 💙", url=ACADEMY_BOT_LINK)],
             ]
         ),
