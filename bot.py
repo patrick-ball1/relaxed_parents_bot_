@@ -221,7 +221,16 @@ async def cb_academy_join(callback: CallbackQuery):
 async def cb_watch_julia(callback: CallbackQuery):
     user_id = callback.from_user.id
     await log_event(user_id, "julia_video_clicked")
-    await callback.answer(url="https://drive.google.com/file/d/1A9aDdJMqTuUftfk2N8P0i89bUloY6Iei/view?usp=sharing")
+    await callback.message.answer(
+        "Вот отзыв Юлии 👇",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(
+                text="▶️ Смотреть отзыв",
+                url="https://drive.google.com/file/d/1A9aDdJMqTuUftfk2N8P0i89bUloY6Iei/view?usp=sharing"
+            )]]
+        ),
+    )
+    await callback.answer()
 
 
 # ──────────────────────────────────────────────
